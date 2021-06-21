@@ -1,0 +1,23 @@
+[[source]]
+url = "https://pypi.mirrors.ustc.edu.cn/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+numpy = "*"
+jupyter = "*"
+pillow = "*"
+requests = "*"
+onnx = "*"
+decorator = "*"
+attrs = "*"
+scipy = "*"
+cffi = "*"
+opencv-python = "*"
+pytest = "*"
+matplotlib = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.6"

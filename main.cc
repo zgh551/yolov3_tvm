@@ -205,11 +205,11 @@ int main(int argc, char *argv[])
     int dtype_code  = kDLFloat;
     int dtype_bits  = 32;
     int dtype_lanes = 1;
-    int device_type = kDLCPU;
+    int device_type = kDLOpenCL;
     int device_id   = 0;
 
     TVMByteArray params_arr;
-    DLDevice dev{kDLCPU, 0};
+    DLDevice dev{kDLOpenCL, 0};
 
     // allocate the array space
     TVMArrayAlloc(input_shape, input_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &x);
@@ -222,7 +222,7 @@ int main(int argc, char *argv[])
     TVMArrayAlloc(output_shape_data3, output_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &data3);
 
     // the memory space allocate
-    //std::vector<float> x_input(gray_image.rows * gray_image.cols);
+    std::vector<float> x_input(resize_image.rows * resize_image.cols);
     //std::vector<float> y_output(10);
         
     // load the mnist dynamic lib
@@ -246,9 +246,10 @@ int main(int argc, char *argv[])
     // get set input data function
     tvm::runtime::PackedFunc set_input = mod.GetFunction("set_input");
     // copy image data to cpu memory space
-    memcpy(x->data, resize_image.data, 3 * resize_image.rows * resize_image.cols * sizeof(float));
+    memcpy(x_input.data(), resize_image.data, 3 * resize_image.rows * resize_image.cols * sizeof(float));
     // from cpu memory space copy data to gpu memory space
-    //TVMArrayCopyFromBytes(x, x_input.data(), gray_image.rows * gray_image.cols * sizeof(float));
+    TVMArrayCopyFromBytes(x, x_input.data(), 3 * resize_image.rows * resize_image.cols * sizeof(float));
+    // using function set_input to configure
     set_input("data", x);
 
     LOG(INFO) << "[yolov3 tvm]:---Run---";
