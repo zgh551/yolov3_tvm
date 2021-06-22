@@ -185,22 +185,19 @@ int main(int argc, char *argv[])
 
     // create tensor
     DLTensor *x;
-    //DLTensor *y;
     DLTensor *attr;
     DLTensor *biases;
     DLTensor *mask;
-    DLTensor *data1;
-    DLTensor *data2;
-    DLTensor *data3;
+    DLTensor *data[3];
     int input_ndim  = 3;
     int output_ndim = 4;
     int64_t input_shape[3]  = {3, resize_image.rows, resize_image.cols};
     int64_t output_shape_attr[1] = {6};
     int64_t output_shape_biases[1] = {18};
     int64_t output_shape_mask[1] = {3};
-    int64_t output_shape_data1[4] = {3, 85, 52, 52};
-    int64_t output_shape_data2[4] = {3, 85, 26, 26};
-    int64_t output_shape_data3[4] = {3, 85, 13, 13};
+    int64_t output_shape_data1[4] = {1, 255, 52, 52};
+    int64_t output_shape_data2[4] = {1, 255, 26, 26};
+    int64_t output_shape_data3[4] = {1, 255, 13, 13};
 
     int dtype_code  = kDLFloat;
     int dtype_bits  = 32;
@@ -214,12 +211,12 @@ int main(int argc, char *argv[])
     // allocate the array space
     TVMArrayAlloc(input_shape, input_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &x);
 
-    TVMArrayAlloc(output_shape_attr, 1, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &attr);
+    TVMArrayAlloc(output_shape_attr, 1, kDLUInt, dtype_bits, dtype_lanes, device_type, device_id, &attr);
+    TVMArrayAlloc(output_shape_mask, 1, kDLUInt, dtype_bits, dtype_lanes, device_type, device_id, &mask);
     TVMArrayAlloc(output_shape_biases, 1, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &biases);
-    TVMArrayAlloc(output_shape_mask, 1, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &mask);
-    TVMArrayAlloc(output_shape_data1, output_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &data1);
-    TVMArrayAlloc(output_shape_data2, output_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &data2);
-    TVMArrayAlloc(output_shape_data3, output_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &data3);
+    TVMArrayAlloc(output_shape_data1, output_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &data[0]);
+    TVMArrayAlloc(output_shape_data2, output_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &data[1]);
+    TVMArrayAlloc(output_shape_data3, output_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &data[2]);
 
     // the memory space allocate
     //std::vector<float> x_input(gray_image.rows * gray_image.cols);
@@ -263,6 +260,24 @@ int main(int argc, char *argv[])
     LOG(INFO) << "[yolov3 tvm]:---Get Output---";
     // get output data function
     tvm::runtime::PackedFunc get_output = mod.GetFunction("get_output");
+    
+    std::vector<uint32_t> attr_output(6);
+    std::vector<float> data_output[3];
+
+    for (int i = 0; i < 3; i++)
+    {
+        get_output(4 * i + 3, attr);
+        memcpy(attr_output.data(), attr->data, 6 * sizeof(uint32_t));
+
+        LOG(INFO) << "[yolov3 tvm]:OutPut " << attr_output[1] << " : " << attr_output[2] << " : " << attr_output[3];
+        LOG(INFO) << "[yolov3 tvm]:data shape " << data[i]->shape[0] << " : " << data[i]->shape[1] << " : " << data[i]->shape[2];
+
+        get_output(4 * i, data[i]);
+        //TVMArrayCopyToBytes(data[i], data_output[i].data(), attr_output[1] * attr_output[2] * attr_output[3] * sizeof(float));
+        //memcpy(data_output[i].data(), data[i], attr_output[1] * attr_output[2] * attr_output[3] * sizeof(float));
+    }
+    LOG(INFO) << data_output[0][0];
+
     //get_output(0, y);
     //TVMArrayCopyToBytes(y, y_output.data(), 10 * sizeof(float));
 
@@ -276,8 +291,8 @@ int main(int argc, char *argv[])
     TVMArrayFree(attr);
     TVMArrayFree(biases);
     TVMArrayFree(mask);
-    TVMArrayFree(data1);
-    TVMArrayFree(data2);
-    TVMArrayFree(data3);
+    TVMArrayFree(data[0]);
+    TVMArrayFree(data[1]);
+    TVMArrayFree(data[2]);
     return 0;
 }
