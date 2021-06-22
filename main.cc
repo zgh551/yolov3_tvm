@@ -189,9 +189,7 @@ int main(int argc, char *argv[])
     DLTensor *attr;
     DLTensor *biases;
     DLTensor *mask;
-    DLTensor *data1;
-    DLTensor *data2;
-    DLTensor *data3;
+    DLTensor *data[3];
     int input_ndim  = 3;
     int output_ndim = 4;
     int64_t input_shape[3]  = {3, resize_image.rows, resize_image.cols};
@@ -214,15 +212,15 @@ int main(int argc, char *argv[])
     // allocate the array space
     TVMArrayAlloc(input_shape, input_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &x);
 
-    TVMArrayAlloc(output_shape_attr, 1, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &attr);
+    TVMArrayAlloc(output_shape_attr, 1, kDLUInt, dtype_bits, dtype_lanes, device_type, device_id, &attr);
+    TVMArrayAlloc(output_shape_mask, 1, kDLUInt, dtype_bits, dtype_lanes, device_type, device_id, &mask);
     TVMArrayAlloc(output_shape_biases, 1, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &biases);
-    TVMArrayAlloc(output_shape_mask, 1, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &mask);
-    TVMArrayAlloc(output_shape_data1, output_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &data1);
-    TVMArrayAlloc(output_shape_data2, output_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &data2);
-    TVMArrayAlloc(output_shape_data3, output_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &data3);
+    TVMArrayAlloc(output_shape_data1, output_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &data[0]);
+    TVMArrayAlloc(output_shape_data2, output_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &data[1]);
+    TVMArrayAlloc(output_shape_data3, output_ndim, dtype_code, dtype_bits, dtype_lanes, device_type, device_id, &data[2]);
 
     // the memory space allocate
-    std::vector<float> x_input(resize_image.rows * resize_image.cols);
+    //std::vector<float> x_input(resize_image.rows * resize_image.cols);
     //std::vector<float> y_output(10);
         
     // load the mnist dynamic lib
@@ -246,9 +244,9 @@ int main(int argc, char *argv[])
     // get set input data function
     tvm::runtime::PackedFunc set_input = mod.GetFunction("set_input");
     // copy image data to cpu memory space
-    memcpy(x_input.data(), resize_image.data, 3 * resize_image.rows * resize_image.cols * sizeof(float));
+    //memcpy(x_input.data(), resize_image.data, 3 * resize_image.rows * resize_image.cols * sizeof(float));
     // from cpu memory space copy data to gpu memory space
-    TVMArrayCopyFromBytes(x, x_input.data(), 3 * resize_image.rows * resize_image.cols * sizeof(float));
+    TVMArrayCopyFromBytes(x, resize_image.data, 3 * resize_image.rows * resize_image.cols * sizeof(float));
     // using function set_input to configure
     set_input("data", x);
 
@@ -264,9 +262,21 @@ int main(int argc, char *argv[])
     LOG(INFO) << "[yolov3 tvm]:---Get Output---";
     // get output data function
     tvm::runtime::PackedFunc get_output = mod.GetFunction("get_output");
-    //get_output(0, y);
-    //TVMArrayCopyToBytes(y, y_output.data(), 10 * sizeof(float));
 
+    // the memory space allocate
+    //std::vector<float> x_input(resize_image.rows * resize_image.cols);
+    std::vector<uint32_t> attr_out(6);
+
+    std::vector<float> data_out[3];
+    for (int i = 0; i < 3; i++)
+    {
+        get_output(4 * i + 3, attr);
+        TVMArrayCopyToBytes(attr, attr_out.data(), 6 * sizeof(float));
+        // 0   1     2     3     4     5
+        // n out_c out_h out_w class total
+        get_output(4 * i, data[i]);
+        TVMArrayCopyToBytes(data[i], data_out[i].data(), attr_out[1] * attr_out[2] * attr_out[3] * sizeof(float));
+    }
     //auto result = static_cast<float *>(y->data);
     //for (int i = 0; i < 10; i++)
     //{
@@ -277,8 +287,8 @@ int main(int argc, char *argv[])
     TVMArrayFree(attr);
     TVMArrayFree(biases);
     TVMArrayFree(mask);
-    TVMArrayFree(data1);
-    TVMArrayFree(data2);
-    TVMArrayFree(data3);
+    TVMArrayFree(data[0]);
+    TVMArrayFree(data[1]);
+    TVMArrayFree(data[2]);
     return 0;
 }
