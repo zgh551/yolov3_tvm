@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
         LOG(INFO) << "[yolov3 tvm]:Image Path: " << argv[1];
         LOG(INFO) << "[yolov3 tvm]:Dynamic Lib Path: " << argv[2];
         LOG(INFO) << "[yolov3 tvm]:Parameter Path: " << argv[3];
-        LOG(INFO) << "[yolov3 tvm]:COCO Path: " << argv[3];
+        //LOG(INFO) << "[yolov3 tvm]:COCO Path: " << argv[3];
     }
     else
     {
@@ -220,7 +220,8 @@ int main(int argc, char *argv[])
 
     // the memory space allocate
     //std::vector<float> x_input(gray_image.rows * gray_image.cols);
-    //std::vector<float> y_output(10);
+    std::vector<uint32_t> attr_output(6);
+    std::vector<float> data_output[3];
         
     // load the mnist dynamic lib
     LOG(INFO) << "[yolov3 tvm]:---Load Dynamic Lib---";
@@ -239,45 +240,47 @@ int main(int argc, char *argv[])
     tvm::runtime::PackedFunc load_params = mod.GetFunction("load_params");
     load_params(params_arr);
 
-    LOG(INFO) << "[yolov3 tvm]:---Set Input---";
     // get set input data function
     tvm::runtime::PackedFunc set_input = mod.GetFunction("set_input");
+    tvm::runtime::PackedFunc run = mod.GetFunction("run");
+    tvm::runtime::PackedFunc get_output = mod.GetFunction("get_output");
+
+    for (int t = 0; t < atoi(argv[4]); t++)
+    {
+    LOG(INFO) << "[yolov3 tvm]:---Set Input---";
     // copy image data to cpu memory space
-    memcpy(x->data, resize_image.data, 3 * resize_image.rows * resize_image.cols * sizeof(float));
+    //memcpy(x->data, resize_image.data, 3 * resize_image.rows * resize_image.cols * sizeof(float));
     // from cpu memory space copy data to gpu memory space
-    //TVMArrayCopyFromBytes(x, x_input.data(), gray_image.rows * gray_image.cols * sizeof(float));
+    TVMArrayCopyFromBytes(x, resize_image.data, 3 * resize_image.rows * resize_image.cols * sizeof(float));
     set_input("data", x);
 
     LOG(INFO) << "[yolov3 tvm]:---Run---";
     // get run function
-    tvm::runtime::PackedFunc run = mod.GetFunction("run");
 
     double s1 = GetCurTime();
     run();
     double s2 = GetCurTime();
-    LOG(INFO) << "[yolov3 tvm]:Run Time " << (s2 - s1);
 
-    LOG(INFO) << "[yolov3 tvm]:---Get Output---";
     // get output data function
-    tvm::runtime::PackedFunc get_output = mod.GetFunction("get_output");
-    
-    std::vector<uint32_t> attr_output(6);
-    std::vector<float> data_output[3];
-
     for (int i = 0; i < 3; i++)
     {
         get_output(4 * i + 3, attr);
-        memcpy(attr_output.data(), attr->data, 6 * sizeof(uint32_t));
+        //memcpy(attr_output.data(), attr->data, 6 * sizeof(float));
+        TVMArrayCopyToBytes(attr, attr_output.data(), 6 * sizeof(uint32_t));
 
-        LOG(INFO) << "[yolov3 tvm]:OutPut " << attr_output[1] << " : " << attr_output[2] << " : " << attr_output[3];
-        LOG(INFO) << "[yolov3 tvm]:data shape " << data[i]->shape[0] << " : " << data[i]->shape[1] << " : " << data[i]->shape[2];
+        //LOG(INFO) << "[yolov3 tvm]:OutPut " << attr_output[1] << " : " << attr_output[2] << " : " << attr_output[3];
+        //LOG(INFO) << "[yolov3 tvm]:data shape " << data[i]->shape[0] << " : " << data[i]->shape[1] << " : " << data[i]->shape[2];
 
         get_output(4 * i, data[i]);
         //TVMArrayCopyToBytes(data[i], data_output[i].data(), attr_output[1] * attr_output[2] * attr_output[3] * sizeof(float));
-        //memcpy(data_output[i].data(), data[i], attr_output[1] * attr_output[2] * attr_output[3] * sizeof(float));
+        //memcpy(data_output[i].data(), data[i]->data, attr_output[1] * attr_output[2] * attr_output[3] * sizeof(float));
     }
-    LOG(INFO) << data_output[0][0];
+    double s3 = GetCurTime();
+    LOG(INFO) << "[yolov3 tvm]:---Get Output---";
 
+    LOG(INFO) << "[yolov3 tvm]:Run Time(run)" << (s2 - s1);
+    LOG(INFO) << "[yolov3 tvm]:Run Time(get_output)" << (s3 - s2);
+    }
     //get_output(0, y);
     //TVMArrayCopyToBytes(y, y_output.data(), 10 * sizeof(float));
 
